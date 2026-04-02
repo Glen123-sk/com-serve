@@ -870,6 +870,14 @@ function initLoginPage() {
   }
 
   const message = document.getElementById("loginMessage");
+  const forgotLink = document.getElementById("forgotPasswordLink");
+
+  if (forgotLink) {
+    forgotLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      window.location.href = "forgot-password.html";
+    });
+  }
 
   document.getElementById("householdLoginForm").addEventListener("submit", (e) => {
     e.preventDefault();
