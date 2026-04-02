@@ -448,6 +448,10 @@ textarea {
   flex-wrap: wrap;
 }
 
+.auth-secondary-actions {
+  margin-top: 0.5rem;
+}
+
 .inline-col {
   display: grid;
   gap: 0.45rem;
@@ -901,6 +905,15 @@ body[data-page="login"] .quote-block {
 
 body[data-page="login"] .auth-title {
   margin-bottom: 0.6rem;
+  text-align: center;
+  display: grid;
+  justify-items: center;
+}
+
+body[data-page="login"] .auth-title h2 {
+  text-align: center;
+  font-size: clamp(1.6rem, 4vw, 2.8rem);
+  line-height: 1.02;
 }
 
 body[data-page="login"] .access-guide {

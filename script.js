@@ -1072,6 +1072,27 @@ function initLoginPage() {
   const message = document.getElementById("loginMessage");
   const forgotLink = document.getElementById("forgotPasswordLink");
   const registerLink = document.getElementById("registerLink");
+  const quickResetBtn = document.getElementById("quickResetBtn");
+  let householdFailuresThisPage = 0;
+
+  const syncQuickResetButton = (lastIdentifier = "") => {
+    if (!quickResetBtn) {
+      return;
+    }
+
+    if (householdFailuresThisPage >= 2) {
+      quickResetBtn.style.display = "inline-flex";
+    } else {
+      quickResetBtn.style.display = "none";
+    }
+
+    quickResetBtn.onclick = () => {
+      const loginIdentifier = String(lastIdentifier || document.getElementById("householdIdentifier").value || "").trim();
+      const email = loginIdentifier.includes("@") ? normalizeEmail(loginIdentifier) : "";
+      const target = email ? `forgot-password.html?email=${encodeURIComponent(email)}` : "forgot-password.html";
+      window.location.href = target;
+    };
+  };
 
   if (forgotLink) {
     forgotLink.addEventListener("click", (e) => {
@@ -1087,26 +1108,26 @@ function initLoginPage() {
     });
   }
 
+  syncQuickResetButton();
+
   document.getElementById("householdLoginForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const guard = canAttemptLogin("household");
-    if (!guard.ok) {
-      message.textContent = `Too many attempts. Try again in ${guard.waitSec}s.`;
-      return;
-    }
-
     const identifier = document.getElementById("householdIdentifier").value.trim();
     const password = document.getElementById("householdPassword").value;
 
     const h = findHouseholdByLoginIdentifier(identifier);
     if (!h || h.password !== password) {
       recordFailedLogin("household");
+      householdFailuresThisPage += 1;
       message.textContent = "Invalid household credentials.";
       addAudit("login_failed", `household:${identifier || "unknown"}`);
+      syncQuickResetButton(identifier);
       return;
     }
 
     clearFailedLogin("household");
+    householdFailuresThisPage = 0;
+    syncQuickResetButton();
     state.session = { role: "household", id: h.id, lastSeen: Date.now() };
     addAudit("login_success", `household:${h.id}`);
     saveSession();
@@ -1116,12 +1137,6 @@ function initLoginPage() {
 
   document.getElementById("adminLoginForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const guard = canAttemptLogin("admin");
-    if (!guard.ok) {
-      message.textContent = `Too many attempts. Try again in ${guard.waitSec}s.`;
-      return;
-    }
-
     const username = document.getElementById("adminUsername").value.trim();
     const password = document.getElementById("adminPassword").value;
 
@@ -1190,27 +1205,25 @@ function initForgotPasswordPage() {
     return;
   }
 
-  const roleSelect = document.getElementById("resetRole");
-  const identifier = document.getElementById("resetIdentifier");
-  const verifier = document.getElementById("resetVerifier");
+  const email = document.getElementById("resetEmail");
   const form = document.getElementById("forgotPasswordForm");
   const msg = document.getElementById("forgotMessage");
-  const verifierHint = document.getElementById("resetVerifierHint");
-
-  const syncFields = () => {
-    verifierHint.textContent = "Enter your registered area (for example: Section A).";
-  };
-
-  roleSelect.onchange = syncFields;
-  syncFields();
+  const prefillEmail = new URLSearchParams(window.location.search).get("email");
+  if (prefillEmail) {
+    email.value = normalizeEmail(prefillEmail);
+  }
 
   form.onsubmit = (e) => {
     e.preventDefault();
-    const role = roleSelect.value;
-    const id = identifier.value.trim();
-    const verify = verifier.value.trim();
+    const requestedEmail = normalizeEmail(email.value);
     const next = document.getElementById("resetNewPassword").value;
     const confirm = document.getElementById("resetConfirmPassword").value;
+
+    if (!requestedEmail || !/^\S+@\S+\.\S+$/.test(requestedEmail)) {
+      msg.textContent = "Enter a valid registered email address.";
+      msg.className = "message";
+      return;
+    }
 
     if (!next || next.length < 4) {
       msg.textContent = "New password must be at least 4 characters.";
@@ -1224,26 +1237,20 @@ function initForgotPasswordPage() {
       return;
     }
 
-    const householdId = id.toUpperCase();
-    const h = getHouseholdById(householdId);
+    const h = state.data.households.find((household) => normalizeEmail(household.email) === requestedEmail);
     if (!h) {
-      msg.textContent = "Household not found.";
-      msg.className = "message";
-      return;
-    }
-
-    if (h.area.toLowerCase() !== verify.toLowerCase()) {
-      msg.textContent = "Verification failed. Check your area and try again.";
+      msg.textContent = "No household account found for that email.";
       msg.className = "message";
       return;
     }
 
     h.password = next;
-    addAudit("password_reset", `household:${householdId}`);
+    addAudit("password_reset", `household:${h.id}`);
+    clearFailedLogin("household");
     if (emailTargetOf(h)) {
       queueEmailMessage({
         toEmail: emailTargetOf(h),
-        toName: h.id,
+        toName: displayNameOf(h),
         subject: "COM-SERVE password reset confirmation",
         message: "Your household password has been updated successfully.",
         meta: { householdId: h.id },

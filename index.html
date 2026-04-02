@@ -19,8 +19,7 @@
   <main class="landing-shell">
     <section class="landing-auth panel auth-glass">
       <div class="auth-title">
-        <h2>Secure Access</h2>
-        <p class="muted">Select your role to continue.</p>
+        <h2>COM-SERVE</h2>
       </div>
 
       <div class="access-guide">
@@ -44,8 +43,11 @@
           <input id="householdPassword" type="password" placeholder="Password" required />
 
           <button class="btn btn-primary" type="submit">Log In</button>
-          <a href="register.html" id="registerLink" class="tiny-link">Register</a>
-          <a href="forgot-password.html" id="forgotPasswordLink" class="tiny-link">Forgot password?</a>
+          <button id="quickResetBtn" class="btn btn-danger" type="button" style="display: none;">Reset Password</button>
+          <div class="inline-row wrap auth-secondary-actions">
+            <a href="register.html" id="registerLink" class="btn btn-ghost">Register</a>
+            <a href="forgot-password.html" id="forgotPasswordLink" class="btn btn-ghost">Forgot Password</a>
+          </div>
           <small class="helper-text">Demo: HH001 / pass001</small>
         </form>
 
