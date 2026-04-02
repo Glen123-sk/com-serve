@@ -109,6 +109,28 @@
         </section>
 
         <section class="card">
+          <h2><span class="material-symbols-rounded icon">mail</span>Email Integration</h2>
+          <p class="muted">Configure EmailJS here so COM-SERVE can send real receipts, reminders, and announcements.</p>
+          <div class="grid grid-2">
+            <div class="inline-col">
+              <input id="emailServiceId" type="text" placeholder="EmailJS service ID" />
+              <input id="emailTemplateId" type="text" placeholder="EmailJS template ID" />
+              <input id="emailPublicKey" type="text" placeholder="EmailJS public key" />
+              <input id="emailSenderName" type="text" placeholder="Sender name" />
+              <input id="emailReplyTo" type="email" placeholder="Reply-to email" />
+              <button id="saveEmailConfigBtn" class="btn btn-primary" type="button">Save Email Setup</button>
+            </div>
+            <div class="inline-col">
+              <input id="emailTestRecipient" type="email" placeholder="Test recipient email" />
+              <input id="emailTestSubject" type="text" placeholder="Test subject" value="COM-SERVE email test" />
+              <textarea id="emailTestMessage" rows="5" placeholder="Test message">This is a test message from COM-SERVE.</textarea>
+              <button id="sendTestEmailBtn" class="btn btn-primary" type="button">Send Test Email</button>
+              <p id="emailConfigMessage" class="message"></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
           <h2>Household Management</h2>
           <input id="adminSearch" type="text" placeholder="Search household ID" />
           <div class="table-wrap">
@@ -117,6 +139,7 @@
                 <tr>
                   <th>ID</th>
                   <th>Area</th>
+                  <th>Email</th>
                   <th>Wallet</th>
                   <th>Outstanding</th>
                   <th>Fines</th>

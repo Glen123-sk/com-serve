@@ -48,6 +48,7 @@
         <p><strong>Household ID:</strong> <span id="profileId">-</span></p>
         <p><strong>Area:</strong> <span id="profileArea">-</span></p>
         <p><strong>Role:</strong> <span id="profileRole">Household</span></p>
+        <p><strong>Email:</strong> <span id="profileEmail">-</span></p>
       </article>
 
       <article class="card">
@@ -64,6 +65,16 @@
             <button class="btn btn-primary" type="submit">Update Password</button>
           </form>
           <p id="settingsMessage" class="message"></p>
+        </section>
+
+        <section class="card">
+          <h2><span class="material-symbols-rounded icon">mail</span>Email Notifications</h2>
+          <form id="emailSettingsForm" class="inline-col">
+            <input id="householdEmail" type="email" placeholder="name@example.com" />
+            <button class="btn btn-primary" type="submit">Save Email Address</button>
+          </form>
+          <p class="muted">Used for payment receipts, announcements, and reminders.</p>
+          <p id="emailSettingsMessage" class="message"></p>
         </section>
       </main>
 

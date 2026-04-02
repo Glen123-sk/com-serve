@@ -2,6 +2,7 @@ const STORAGE_KEY = "comServeData";
 const SESSION_KEY = "comServeSession";
 const THEME_KEY = "comServeTheme";
 const LOGIN_GUARD_KEY = "comServeLoginGuard";
+const EMAIL_SDK_SRC = "https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js";
 const SESSION_TTL_MS = 20 * 60 * 1000;
 
 const money = (v) => `R${Number(v || 0).toFixed(2)}`;
@@ -15,6 +16,9 @@ const state = {
   loginGuard: null,
 };
 
+let emailSdkPromise = null;
+let emailJsReady = false;
+
 function simpleHash(input) {
   let hash = 2166136261;
   for (let i = 0; i < input.length; i += 1) {
@@ -27,6 +31,135 @@ function simpleHash(input) {
 function initSecurityStructures() {
   state.data.auditTrail = state.data.auditTrail || [];
   state.data.runtimeErrors = state.data.runtimeErrors || [];
+  state.data.emailLog = state.data.emailLog || [];
+  state.data.emailConfig = state.data.emailConfig || {
+    serviceId: "",
+    templateId: "",
+    publicKey: "",
+    senderName: "COM-SERVE",
+    replyTo: "",
+  };
+}
+
+function initEmailSdk() {
+  if (window.emailjs) {
+    return Promise.resolve(window.emailjs);
+  }
+
+  if (!emailSdkPromise) {
+    emailSdkPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = EMAIL_SDK_SRC;
+      script.async = true;
+      script.onload = () => resolve(window.emailjs);
+      script.onerror = () => reject(new Error("Unable to load email SDK."));
+      document.head.appendChild(script);
+    });
+  }
+
+  return emailSdkPromise;
+}
+
+function emailConfig() {
+  initSecurityStructures();
+  return state.data.emailConfig;
+}
+
+function updateEmailConfig(nextConfig) {
+  initSecurityStructures();
+  state.data.emailConfig = {
+    ...emailConfig(),
+    ...nextConfig,
+  };
+  saveData();
+}
+
+function logEmailEvent(status, details) {
+  initSecurityStructures();
+  state.data.emailLog.unshift({
+    id: uid(),
+    date: new Date().toISOString(),
+    status,
+    details,
+  });
+  state.data.emailLog = state.data.emailLog.slice(0, 60);
+  saveData();
+}
+
+function emailIsConfigured() {
+  const cfg = emailConfig();
+  return Boolean(cfg.serviceId && cfg.templateId && cfg.publicKey);
+}
+
+function emailTargetOf(household) {
+  return (household.email || "").trim();
+}
+
+async function sendEmailMessage({ toEmail, toName, subject, message, replyTo = "", meta = {} }) {
+  const cfg = emailConfig();
+  if (!cfg.serviceId || !cfg.templateId || !cfg.publicKey) {
+    return { ok: false, skipped: true, reason: "Email not configured." };
+  }
+
+  if (!toEmail) {
+    return { ok: false, skipped: true, reason: "Recipient email missing." };
+  }
+
+  try {
+    const sdk = await initEmailSdk();
+    if (!emailJsReady) {
+      try {
+        if (typeof sdk.init === "function") {
+          sdk.init({ publicKey: cfg.publicKey });
+        }
+      } catch {
+        try {
+          sdk.init(cfg.publicKey);
+        } catch (error) {
+          throw new Error(error.message || "Failed to initialise email SDK.");
+        }
+      }
+      emailJsReady = true;
+    }
+
+    await sdk.send(cfg.serviceId, cfg.templateId, {
+      to_email: toEmail,
+      to_name: toName || toEmail,
+      subject,
+      message,
+      from_name: cfg.senderName || "COM-SERVE",
+      reply_to: replyTo || cfg.replyTo || "",
+      ...meta,
+    });
+
+    logEmailEvent("sent", `${toEmail} - ${subject}`);
+    return { ok: true };
+  } catch (error) {
+    logEmailEvent("failed", `${toEmail} - ${subject}: ${error.message || error}`);
+    addRuntimeError("email", error.message || String(error));
+    return { ok: false, skipped: false, reason: error.message || String(error) };
+  }
+}
+
+function queueEmailMessage(payload) {
+  void sendEmailMessage(payload);
+}
+
+function sendBroadcastEmailToHouseholds({ subject, message, meta = {} }) {
+  state.data.households.forEach((household) => {
+    const recipient = emailTargetOf(household);
+    if (!recipient) {
+      return;
+    }
+
+    queueEmailMessage({
+      toEmail: recipient,
+      toName: household.id,
+      subject,
+      message,
+      meta: { householdId: household.id, ...meta },
+    });
+  });
 }
 
 function addAudit(action, details = "") {
@@ -108,6 +241,7 @@ function seedData() {
       password: `pass${String(i).padStart(3, "0")}`,
       area: areas[(i - 1) % areas.length],
       active: i !== 7 && i !== 14,
+      email: "",
       walletBalance: 10 + (i % 5) * 14,
       dues: {},
       paymentHistory: [],
@@ -216,6 +350,7 @@ function loadData() {
   state.data.announcements = state.data.announcements || [];
   state.data.notifications = state.data.notifications || [];
   state.data.activity = state.data.activity || [];
+  state.data.emailLog = state.data.emailLog || [];
   initSecurityStructures();
   applyFines(state.data);
   saveData();
@@ -644,6 +779,15 @@ function payDue(household, funeralId, method) {
   addNotification(household.id, "Payment successful.", "info");
   addActivity(`${household.id} paid ${funeralId} via ${method}.`);
   addAudit("payment", `${household.id} -> ${funeralId} (${method})`);
+  if (emailTargetOf(household)) {
+    queueEmailMessage({
+      toEmail: emailTargetOf(household),
+      toName: household.id,
+      subject: `COM-SERVE payment receipt for ${funeralId}`,
+      message: `Your payment of ${money(amount)} via ${method} was successful.`,
+      meta: { householdId: household.id, funeralId, method, amount: money(amount) },
+    });
+  }
   saveData();
   return { ok: true, message: `Payment successful via ${method}.` };
 }
@@ -660,6 +804,15 @@ function topupHousehold(household, amount) {
   });
   addNotification(household.id, `Wallet credited with ${money(amount)}.`, "info");
   addAudit("wallet_topup", `${household.id} +${money(amount)}`);
+  if (emailTargetOf(household)) {
+    queueEmailMessage({
+      toEmail: emailTargetOf(household),
+      toName: household.id,
+      subject: `COM-SERVE wallet top-up`,
+      message: `Your wallet was credited with ${money(amount)}.`,
+      meta: { householdId: household.id, amount: money(amount) },
+    });
+  }
   saveData();
 }
 
@@ -711,6 +864,11 @@ function triggerFuneralEvent(title, dueDays) {
   addNotification("all", `New funeral contribution required: ${money(event.amount)}.`, "info");
   addActivity(`Admin triggered event: ${title}.`);
   addAudit("trigger_event", `${title} due ${event.dueDate}`);
+  sendBroadcastEmailToHouseholds({
+    subject: `COM-SERVE funeral contribution: ${title}`,
+    message: `A new funeral contribution has been created. Amount: ${money(event.amount)}. Due date: ${event.dueDate}.`,
+    meta: { funeralId: event.id, dueDate: event.dueDate, amount: money(event.amount) },
+  });
   saveData();
 }
 
@@ -724,6 +882,11 @@ function postAnnouncement(title, body) {
   addNotification("all", `Announcement: ${title}`, "info");
   addActivity(`Admin posted announcement: ${title}.`);
   addAudit("announcement", title);
+  sendBroadcastEmailToHouseholds({
+    subject: `COM-SERVE announcement: ${title}`,
+    message: body,
+    meta: { announcementTitle: title },
+  });
   saveData();
 }
 
@@ -947,15 +1110,9 @@ function initForgotPasswordPage() {
   const msg = document.getElementById("forgotMessage");
 
   const syncFields = () => {
-    if (roleSelect.value === "admin") {
-      identifier.placeholder = "admin";
-      verifier.placeholder = "COM-SERVE-ADMIN";
-      verifierHint.textContent = "Admin reset key required for confirmation.";
-    } else {
-      identifier.placeholder = "HH001";
-      verifier.placeholder = "Section A";
-      verifierHint.textContent = "Enter your registered area (for example: Section A).";
-    }
+    identifier.placeholder = "HH001";
+    verifier.placeholder = "Section A";
+    verifierHint.textContent = "Enter your registered area (for example: Section A).";
   };
 
   roleSelect.onchange = syncFields;
@@ -981,46 +1138,35 @@ function initForgotPasswordPage() {
       return;
     }
 
-    if (role === "household") {
-      const householdId = id.toUpperCase();
-      const h = getHouseholdById(householdId);
-      if (!h) {
-        msg.textContent = "Household not found.";
-        msg.className = "message";
-        return;
-      }
-
-      if (h.area.toLowerCase() !== verify.toLowerCase()) {
-        msg.textContent = "Verification failed. Check your area and try again.";
-        msg.className = "message";
-        return;
-      }
-
-      h.password = next;
-      addAudit("password_reset", `household:${householdId}`);
-      saveData();
-      msg.textContent = "Password reset successful. Redirecting to login...";
-      msg.className = "message ok";
-      showToast("Password reset successful.");
-      setTimeout(() => {
-        window.location.href = "index.html";
-      }, 1200);
-      return;
-    }
-
-    const adminKey = "COM-SERVE-ADMIN";
-    if (id !== state.data.admin.username || verify !== adminKey) {
-      msg.textContent = "Admin verification failed.";
+    const householdId = id.toUpperCase();
+    const h = getHouseholdById(householdId);
+    if (!h) {
+      msg.textContent = "Household not found.";
       msg.className = "message";
       return;
     }
 
-    state.data.admin.password = next;
-    addAudit("password_reset", "admin");
+    if (h.area.toLowerCase() !== verify.toLowerCase()) {
+      msg.textContent = "Verification failed. Check your area and try again.";
+      msg.className = "message";
+      return;
+    }
+
+    h.password = next;
+    addAudit("password_reset", `household:${householdId}`);
+    if (emailTargetOf(h)) {
+      queueEmailMessage({
+        toEmail: emailTargetOf(h),
+        toName: h.id,
+        subject: "COM-SERVE password reset confirmation",
+        message: "Your household password has been updated successfully.",
+        meta: { householdId: h.id },
+      });
+    }
     saveData();
-    msg.textContent = "Admin password reset successful. Redirecting to login...";
+    msg.textContent = "Password reset successful. Redirecting to login...";
     msg.className = "message ok";
-    showToast("Admin password reset successful.");
+    showToast("Password reset successful.");
     setTimeout(() => {
       window.location.href = "index.html";
     }, 1200);
@@ -1040,7 +1186,10 @@ function renderHouseholdDashboard() {
 
   document.getElementById("walletBalance").textContent = money(h.walletBalance);
   document.getElementById("finesOwed").textContent = money(t.fines);
-  document.getElementById("consistencyText").textContent = `${c.paid} of ${c.total} events paid (${c.percent}%)`;
+  const consistencyText = document.getElementById("consistencyText");
+  if (consistencyText) {
+    consistencyText.textContent = `${c.paid} of ${c.total} events paid (${c.percent}%)`;
+  }
 
   const statusEl = document.getElementById("paymentStatus");
   statusEl.textContent = status.text;
@@ -1301,6 +1450,15 @@ function initSettingsPage() {
   const h = currentHousehold();
   document.getElementById("profileId").textContent = h.id;
   document.getElementById("profileArea").textContent = h.area;
+  const profileEmail = document.getElementById("profileEmail");
+  if (profileEmail) {
+    profileEmail.textContent = h.email || "Not set";
+  }
+
+  const householdEmail = document.getElementById("householdEmail");
+  if (householdEmail) {
+    householdEmail.value = h.email || "";
+  }
 
   const toggle = document.getElementById("settingsDarkToggle");
   toggle.checked = document.body.classList.contains("dark");
@@ -1337,6 +1495,30 @@ function initSettingsPage() {
     document.getElementById("currentPassword").value = "";
     document.getElementById("newPassword").value = "";
   };
+
+  const emailMsg = document.getElementById("emailSettingsMessage");
+  const emailForm = document.getElementById("emailSettingsForm");
+  if (emailForm) {
+    emailForm.onsubmit = (e) => {
+      e.preventDefault();
+      const nextEmail = document.getElementById("householdEmail").value.trim();
+      if (nextEmail && !/^\S+@\S+\.\S+$/.test(nextEmail)) {
+        emailMsg.textContent = "Enter a valid email address.";
+        emailMsg.className = "message";
+        return;
+      }
+
+      h.email = nextEmail;
+      addAudit("email_update", `${h.id}:${nextEmail || "cleared"}`);
+      saveData();
+      if (profileEmail) {
+        profileEmail.textContent = h.email || "Not set";
+      }
+      emailMsg.textContent = h.email ? `Email saved: ${h.email}` : "Email address cleared.";
+      emailMsg.className = "message ok";
+      showToast("Email address saved.");
+    };
+  }
 }
 
 function renderAdminPage() {
@@ -1423,6 +1605,7 @@ function renderAdminPage() {
       <tr>
         <td>${h.id}</td>
         <td>${h.area}</td>
+        <td>${h.email || "-"}</td>
         <td>${money(h.walletBalance)}</td>
         <td>${money(t.outstanding)}</td>
         <td>${money(t.fines)}</td>
@@ -1477,6 +1660,62 @@ function initAdminPage() {
   if (!requireAuth("admin")) {
     return;
   }
+
+  const emailConfigMsg = document.getElementById("emailConfigMessage");
+  const cfg = emailConfig();
+  document.getElementById("emailServiceId").value = cfg.serviceId || "";
+  document.getElementById("emailTemplateId").value = cfg.templateId || "";
+  document.getElementById("emailPublicKey").value = cfg.publicKey || "";
+  document.getElementById("emailSenderName").value = cfg.senderName || "COM-SERVE";
+  document.getElementById("emailReplyTo").value = cfg.replyTo || "";
+
+  document.getElementById("saveEmailConfigBtn").onclick = () => {
+    updateEmailConfig({
+      serviceId: document.getElementById("emailServiceId").value.trim(),
+      templateId: document.getElementById("emailTemplateId").value.trim(),
+      publicKey: document.getElementById("emailPublicKey").value.trim(),
+      senderName: document.getElementById("emailSenderName").value.trim() || "COM-SERVE",
+      replyTo: document.getElementById("emailReplyTo").value.trim(),
+    });
+    emailConfigMsg.textContent = "Email setup saved.";
+    emailConfigMsg.className = "message ok";
+    showToast("Email setup saved.");
+  };
+
+  document.getElementById("sendTestEmailBtn").onclick = async () => {
+    const recipient = document.getElementById("emailTestRecipient").value.trim();
+    const subject = document.getElementById("emailTestSubject").value.trim() || "COM-SERVE email test";
+    const message = document.getElementById("emailTestMessage").value.trim() || "This is a test message from COM-SERVE.";
+
+    if (!recipient) {
+      emailConfigMsg.textContent = "Enter a test recipient email first.";
+      emailConfigMsg.className = "message";
+      return;
+    }
+
+    emailConfigMsg.textContent = "Sending test email...";
+    emailConfigMsg.className = "message";
+    const response = await sendEmailMessage({
+      toEmail: recipient,
+      toName: recipient,
+      subject,
+      message,
+      meta: { type: "test" },
+    });
+
+    if (response.ok) {
+      emailConfigMsg.textContent = "Test email sent successfully.";
+      emailConfigMsg.className = "message ok";
+      showToast("Test email sent.");
+    } else if (response.skipped) {
+      emailConfigMsg.textContent = response.reason || "Email is not configured yet.";
+      emailConfigMsg.className = "message";
+    } else {
+      emailConfigMsg.textContent = `Email failed: ${response.reason}`;
+      emailConfigMsg.className = "message";
+      showToast("Test email failed.", "error");
+    }
+  };
 
   document.getElementById("triggerFuneralBtn").onclick = () => {
     const title = document.getElementById("funeralTitle").value.trim() || `Funeral Event ${state.data.funeralEvents.length + 1}`;

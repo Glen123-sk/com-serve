@@ -409,6 +409,7 @@ label {
 
 input,
 select,
+textarea,
 button {
   font-family: inherit;
 }
@@ -423,6 +424,18 @@ select {
   padding: 0.64rem 0.68rem;
   min-height: 44px;
   margin-bottom: 0.72rem;
+}
+
+textarea {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  background: color-mix(in srgb, var(--surface) 96%, var(--accent) 4%);
+  color: var(--text);
+  padding: 0.64rem 0.68rem;
+  min-height: 120px;
+  margin-bottom: 0.72rem;
+  resize: vertical;
 }
 
 .inline-row {
