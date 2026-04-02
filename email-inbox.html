@@ -23,17 +23,15 @@
       <p class="muted">Admin Control Center</p>
       <nav class="nav nav-stack" id="adminNav">
         <a href="admin.html">Admin Dashboard</a>
-        <a href="email-inbox.html">Email Inbox</a>
-        <a href="mass-email.html">Mass Email</a>
-        <a href="testmail.html">Testmail Inbox</a>
+        <a href="email-inbox.html">Email Services</a>
       </nav>
     </aside>
 
     <div class="app-main">
       <header class="site-header">
         <div>
-          <h1 class="page-title">Email Inbox</h1>
-          <p class="muted">Receive and manage messages from website visitors and community members.</p>
+          <h1 class="page-title">Email Services</h1>
+          <p class="muted">Configure EmailJS, send mass emails, and manage website inbox messages from one page.</p>
         </div>
         <div class="top-actions">
           <button id="themeToggle" class="btn btn-ghost" type="button">Theme</button>
@@ -42,6 +40,54 @@
       </header>
 
       <main class="page-wrap">
+        <section class="card">
+          <h2><span class="material-symbols-rounded icon">send</span>EmailJS Delivery Setup</h2>
+          <p class="muted">Gmail target: <strong>com205260@gmail.com</strong></p>
+          <div class="grid grid-2">
+            <div class="inline-col">
+              <input id="emailServiceId" type="text" placeholder="EmailJS service ID" />
+              <input id="emailTemplateId" type="text" placeholder="EmailJS template ID" />
+              <input id="emailPublicKey" type="text" placeholder="EmailJS public key" />
+              <input id="emailSenderName" type="text" placeholder="Sender name" />
+              <input id="emailReplyTo" type="email" placeholder="Reply-to email" />
+              <button id="gmailDefaultsBtn" class="btn btn-ghost" type="button">Use Gmail Defaults</button>
+              <button id="saveEmailConfigBtn" class="btn btn-primary" type="button">Save Email Setup</button>
+            </div>
+            <div class="inline-col">
+              <input id="emailTestRecipient" type="email" placeholder="Test recipient email" />
+              <input id="emailTestSubject" type="text" placeholder="Test subject" value="COM-SERVE email test" />
+              <textarea id="emailTestMessage" rows="5" placeholder="Test message">This is a test message from COM-SERVE.</textarea>
+              <button id="sendTestEmailBtn" class="btn btn-primary" type="button">Send Test Email</button>
+              <p id="emailConfigMessage" class="message"></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2><span class="material-symbols-rounded icon">campaign</span>Mass Email</h2>
+          <div class="grid grid-2">
+            <div class="inline-col">
+              <label for="massEmailGroup">Target Group</label>
+              <select id="massEmailGroup">
+                <option value="all">Everyone with an email</option>
+                <option value="outstanding">Households with outstanding payments</option>
+              </select>
+              <input id="massEmailSubject" type="text" placeholder="Subject" />
+              <textarea id="massEmailMessage" rows="8" placeholder="Message"></textarea>
+              <button id="sendMassEmailBtn" class="btn btn-primary" type="button">Send Mass Email</button>
+            </div>
+
+            <div class="inline-col">
+              <div class="list">
+                <div class="list-item">Targets only households with a saved email address.</div>
+                <div class="list-item">Uses the household's chosen display name for personalization.</div>
+                <div class="list-item">Includes current outstanding totals for the outstanding group.</div>
+              </div>
+              <p id="massEmailStatus" class="message"></p>
+            </div>
+          </div>
+        </section>
+
         <section class="card">
           <h2><span class="material-symbols-rounded icon">settings</span>Email Configuration</h2>
           <p class="muted">Set up where contact form emails are sent. This is typically your admin email address or a contact email.</p>

@@ -154,6 +154,49 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
+function buildEmailTemplateParams({ toEmail, toName, subject, message, senderName, replyTo, meta }) {
+  // Include common alias keys so different EmailJS templates can still resolve values.
+  return {
+    to_email: toEmail,
+    to_name: toName || toEmail,
+    subject,
+    message,
+    from_name: senderName || "COM-SERVE",
+    reply_to: replyTo || "",
+    email: toEmail,
+    name: toName || toEmail,
+    recipient: toEmail,
+    recipient_name: toName || toEmail,
+    title: subject,
+    content: message,
+    ...meta,
+  };
+}
+
+function explainEmailError(error) {
+  const status = error && typeof error.status !== "undefined" ? ` [status ${error.status}]` : "";
+  const raw = String((error && (error.text || error.message)) || error || "Unknown email error").trim();
+  const lower = raw.toLowerCase();
+
+  if (lower.includes("public key") || lower.includes("user id")) {
+    return `Invalid EmailJS public key.${status}`;
+  }
+
+  if (lower.includes("service") && lower.includes("not found")) {
+    return `EmailJS service ID not found. Check serviceId.${status}`;
+  }
+
+  if (lower.includes("template") && lower.includes("not found")) {
+    return `EmailJS template ID not found. Check templateId.${status}`;
+  }
+
+  if (lower.includes("origin") || lower.includes("domain")) {
+    return `This site/domain is not allowed in EmailJS settings.${status}`;
+  }
+
+  return `${raw}${status}`;
+}
+
 function nextHouseholdId() {
   const maxNumber = state.data.households.reduce((max, household) => {
     const match = String(household.id || "").match(/^HH(\d{3})$/i);
@@ -204,22 +247,25 @@ async function sendEmailMessage({ toEmail, toName, subject, message, replyTo = "
       emailJsReady = true;
     }
 
-    await sdk.send(cfg.serviceId, cfg.templateId, {
-      to_email: toEmail,
-      to_name: toName || toEmail,
+    const templateParams = buildEmailTemplateParams({
+      toEmail,
+      toName,
       subject,
       message,
-      from_name: cfg.senderName || "COM-SERVE",
-      reply_to: replyTo || cfg.replyTo || "",
-      ...meta,
+      senderName: cfg.senderName,
+      replyTo: replyTo || cfg.replyTo || "",
+      meta,
     });
+
+    await sdk.send(cfg.serviceId, cfg.templateId, templateParams);
 
     logEmailEvent("sent", `${toEmail} - ${subject}`);
     return { ok: true };
   } catch (error) {
-    logEmailEvent("failed", `${toEmail} - ${subject}: ${error.message || error}`);
-    addRuntimeError("email", error.message || String(error));
-    return { ok: false, skipped: false, reason: error.message || String(error) };
+    const reason = explainEmailError(error);
+    logEmailEvent("failed", `${toEmail} - ${subject}: ${reason}`);
+    addRuntimeError("email", reason);
+    return { ok: false, skipped: false, reason };
   }
 }
 
@@ -1914,81 +1960,6 @@ function initAdminPage() {
     return;
   }
 
-  const emailConfigMsg = document.getElementById("emailConfigMessage");
-  const cfg = emailConfig();
-  document.getElementById("emailServiceId").value = cfg.serviceId || "";
-  document.getElementById("emailTemplateId").value = cfg.templateId || "";
-  document.getElementById("emailPublicKey").value = cfg.publicKey || "";
-  document.getElementById("emailSenderName").value = cfg.senderName || "COM-SERVE";
-  document.getElementById("emailReplyTo").value = cfg.replyTo || "com205260@gmail.com";
-  document.getElementById("emailTestRecipient").value = "com205260@gmail.com";
-
-  const gmailDefaultsBtn = document.getElementById("gmailDefaultsBtn");
-  if (gmailDefaultsBtn) {
-    gmailDefaultsBtn.onclick = () => {
-      document.getElementById("emailSenderName").value = "COM-SERVE";
-      document.getElementById("emailReplyTo").value = "com205260@gmail.com";
-      document.getElementById("emailTestRecipient").value = "com205260@gmail.com";
-      if (!document.getElementById("emailTestSubject").value.trim()) {
-        document.getElementById("emailTestSubject").value = "COM-SERVE Gmail test";
-      }
-      if (!document.getElementById("emailTestMessage").value.trim()) {
-        document.getElementById("emailTestMessage").value = "This is a Gmail test message from COM-SERVE.";
-      }
-      emailConfigMsg.textContent = "Gmail defaults loaded. Add Service ID, Template ID, and Public Key, then save.";
-      emailConfigMsg.className = "message";
-      showToast("Gmail defaults loaded.");
-    };
-  }
-
-  document.getElementById("saveEmailConfigBtn").onclick = () => {
-    updateEmailConfig({
-      serviceId: document.getElementById("emailServiceId").value.trim(),
-      templateId: document.getElementById("emailTemplateId").value.trim(),
-      publicKey: document.getElementById("emailPublicKey").value.trim(),
-      senderName: document.getElementById("emailSenderName").value.trim() || "COM-SERVE",
-      replyTo: document.getElementById("emailReplyTo").value.trim(),
-    });
-    emailConfigMsg.textContent = "Email setup saved.";
-    emailConfigMsg.className = "message ok";
-    showToast("Email setup saved.");
-  };
-
-  document.getElementById("sendTestEmailBtn").onclick = async () => {
-    const recipient = document.getElementById("emailTestRecipient").value.trim();
-    const subject = document.getElementById("emailTestSubject").value.trim() || "COM-SERVE email test";
-    const message = document.getElementById("emailTestMessage").value.trim() || "This is a test message from COM-SERVE.";
-
-    if (!recipient) {
-      emailConfigMsg.textContent = "Enter a test recipient email first.";
-      emailConfigMsg.className = "message";
-      return;
-    }
-
-    emailConfigMsg.textContent = "Sending test email...";
-    emailConfigMsg.className = "message";
-    const response = await sendEmailMessage({
-      toEmail: recipient,
-      toName: recipient,
-      subject,
-      message,
-      meta: { type: "test" },
-    });
-
-    if (response.ok) {
-      emailConfigMsg.textContent = "Test email sent successfully.";
-      emailConfigMsg.className = "message ok";
-      showToast("Test email sent.");
-    } else if (response.skipped) {
-      emailConfigMsg.textContent = response.reason || "Email is not configured yet.";
-      emailConfigMsg.className = "message";
-    } else {
-      emailConfigMsg.textContent = `Email failed: ${response.reason}`;
-      emailConfigMsg.className = "message";
-      showToast("Test email failed.", "error");
-    }
-  };
-
   document.getElementById("triggerFuneralBtn").onclick = () => {
     const title = document.getElementById("funeralTitle").value.trim() || `Funeral Event ${state.data.funeralEvents.length + 1}`;
     const dueDays = Math.max(1, Number(document.getElementById("funeralDueDays").value) || 7);
@@ -2068,25 +2039,107 @@ function initMassEmailPage() {
   if (!requireAuth("admin")) {
     return;
   }
+  window.location.href = "email-inbox.html";
+}
+
+function initEmailInboxPage() {
+  if (!requireAuth("admin")) {
+    return;
+  }
+
+  const cfgEmail = emailConfig();
+  const emailConfigMsg = document.getElementById("emailConfigMessage");
+  document.getElementById("emailServiceId").value = cfgEmail.serviceId || "";
+  document.getElementById("emailTemplateId").value = cfgEmail.templateId || "";
+  document.getElementById("emailPublicKey").value = cfgEmail.publicKey || "";
+  document.getElementById("emailSenderName").value = cfgEmail.senderName || "COM-SERVE";
+  document.getElementById("emailReplyTo").value = cfgEmail.replyTo || "com205260@gmail.com";
+  document.getElementById("emailTestRecipient").value = "com205260@gmail.com";
+
+  const gmailDefaultsBtn = document.getElementById("gmailDefaultsBtn");
+  if (gmailDefaultsBtn) {
+    gmailDefaultsBtn.onclick = () => {
+      document.getElementById("emailSenderName").value = "COM-SERVE";
+      document.getElementById("emailReplyTo").value = "com205260@gmail.com";
+      document.getElementById("emailTestRecipient").value = "com205260@gmail.com";
+      if (!document.getElementById("emailTestSubject").value.trim()) {
+        document.getElementById("emailTestSubject").value = "COM-SERVE Gmail test";
+      }
+      if (!document.getElementById("emailTestMessage").value.trim()) {
+        document.getElementById("emailTestMessage").value = "This is a Gmail test message from COM-SERVE.";
+      }
+      emailConfigMsg.textContent = "Gmail defaults loaded. Add Service ID, Template ID, and Public Key, then save.";
+      emailConfigMsg.className = "message";
+      showToast("Gmail defaults loaded.");
+    };
+  }
+
+  document.getElementById("saveEmailConfigBtn").onclick = () => {
+    updateEmailConfig({
+      serviceId: document.getElementById("emailServiceId").value.trim(),
+      templateId: document.getElementById("emailTemplateId").value.trim(),
+      publicKey: document.getElementById("emailPublicKey").value.trim(),
+      senderName: document.getElementById("emailSenderName").value.trim() || "COM-SERVE",
+      replyTo: document.getElementById("emailReplyTo").value.trim(),
+    });
+    emailConfigMsg.textContent = "Email setup saved.";
+    emailConfigMsg.className = "message ok";
+    showToast("Email setup saved.");
+  };
+
+  document.getElementById("sendTestEmailBtn").onclick = async () => {
+    const recipient = document.getElementById("emailTestRecipient").value.trim();
+    const subject = document.getElementById("emailTestSubject").value.trim() || "COM-SERVE email test";
+    const message = document.getElementById("emailTestMessage").value.trim() || "This is a test message from COM-SERVE.";
+
+    if (!recipient) {
+      emailConfigMsg.textContent = "Enter a test recipient email first.";
+      emailConfigMsg.className = "message";
+      return;
+    }
+
+    emailConfigMsg.textContent = "Sending test email...";
+    emailConfigMsg.className = "message";
+    const response = await sendEmailMessage({
+      toEmail: recipient,
+      toName: recipient,
+      subject,
+      message,
+      meta: { type: "test" },
+    });
+
+    if (response.ok) {
+      emailConfigMsg.textContent = "Test email sent successfully.";
+      emailConfigMsg.className = "message ok";
+      showToast("Test email sent.");
+    } else if (response.skipped) {
+      emailConfigMsg.textContent = response.reason || "Email is not configured yet.";
+      emailConfigMsg.className = "message";
+    } else {
+      emailConfigMsg.textContent = `Email failed: ${response.reason}`;
+      emailConfigMsg.className = "message";
+      showToast("Test email failed.", "error");
+    }
+  };
 
   const groupSelect = document.getElementById("massEmailGroup");
   const subjectInput = document.getElementById("massEmailSubject");
   const messageInput = document.getElementById("massEmailMessage");
-  const statusMessage = document.getElementById("massEmailStatus");
+  const massStatusMessage = document.getElementById("massEmailStatus");
   const sendButton = document.getElementById("sendMassEmailBtn");
 
   if (!subjectInput.value) {
     subjectInput.value = "COM-SERVE community update";
   }
 
-  const updatePreview = () => {
+  const updateMassPreview = () => {
     const recipients = householdsEligibleForMassEmail(groupSelect.value);
-    statusMessage.textContent = `${recipients.length} household(s) are eligible for this message.`;
-    statusMessage.className = "message";
+    massStatusMessage.textContent = `${recipients.length} household(s) are eligible for this message.`;
+    massStatusMessage.className = "message";
   };
 
-  groupSelect.onchange = updatePreview;
-  updatePreview();
+  groupSelect.onchange = updateMassPreview;
+  updateMassPreview();
 
   sendButton.onclick = async () => {
     const group = groupSelect.value;
@@ -2094,41 +2147,35 @@ function initMassEmailPage() {
     const message = messageInput.value.trim();
 
     if (!subject || !message) {
-      statusMessage.textContent = "Enter both a subject and a message.";
-      statusMessage.className = "message";
+      massStatusMessage.textContent = "Enter both a subject and a message.";
+      massStatusMessage.className = "message";
       return;
     }
 
     const recipients = householdsEligibleForMassEmail(group);
     if (!recipients.length) {
-      statusMessage.textContent = "No households with saved email addresses match this group.";
-      statusMessage.className = "message";
+      massStatusMessage.textContent = "No households with saved email addresses match this group.";
+      massStatusMessage.className = "message";
       return;
     }
 
     sendButton.disabled = true;
-    statusMessage.textContent = `Sending to ${recipients.length} household(s)...`;
-    statusMessage.className = "message";
+    massStatusMessage.textContent = `Sending to ${recipients.length} household(s)...`;
+    massStatusMessage.className = "message";
 
     const results = await sendMassEmailToGroup({ group, subject, message });
     if (results.sent > 0) {
-      statusMessage.textContent = `Mass email complete: ${results.sent} sent, ${results.failed} failed, ${results.skipped} skipped.`;
-      statusMessage.className = "message ok";
+      massStatusMessage.textContent = `Mass email complete: ${results.sent} sent, ${results.failed} failed, ${results.skipped} skipped.`;
+      massStatusMessage.className = "message ok";
       showToast(`Mass email sent to ${results.sent} recipient(s).`);
     } else {
-      statusMessage.textContent = `Mass email did not send. ${results.failed} failed, ${results.skipped} skipped.`;
-      statusMessage.className = "message";
+      massStatusMessage.textContent = `Mass email did not send. ${results.failed} failed, ${results.skipped} skipped.`;
+      massStatusMessage.className = "message";
       showToast("Mass email not sent.", "error");
     }
 
     sendButton.disabled = false;
   };
-}
-
-function initEmailInboxPage() {
-  if (!requireAuth("admin")) {
-    return;
-  }
 
   const cfg = inboxConfig();
   const inboxEmailInput = document.getElementById("inboxEmail");

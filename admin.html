@@ -23,8 +23,7 @@
       <p class="muted">Admin Control Center</p>
       <nav class="nav nav-stack" id="adminNav">
         <a href="admin.html">Admin Dashboard</a>
-        <a href="email-inbox.html">Email Inbox</a>
-        <a href="mass-email.html">Mass Email</a>
+        <a href="email-inbox.html">Email Services</a>
       </nav>
     </aside>
 
@@ -108,30 +107,6 @@
             <h4>Runtime Monitor</h4>
             <div id="adminRuntime" class="list"></div>
           </article>
-        </section>
-
-        <section class="card">
-          <h2><span class="material-symbols-rounded icon">mail</span>Email Integration</h2>
-          <p class="muted">Configure EmailJS here so COM-SERVE can send real receipts, reminders, announcements, and contact-form emails.</p>
-          <p class="muted">Gmail target: <strong>com205260@gmail.com</strong></p>
-          <div class="grid grid-2">
-            <div class="inline-col">
-              <input id="emailServiceId" type="text" placeholder="EmailJS service ID" />
-              <input id="emailTemplateId" type="text" placeholder="EmailJS template ID" />
-              <input id="emailPublicKey" type="text" placeholder="EmailJS public key" />
-              <input id="emailSenderName" type="text" placeholder="Sender name" />
-              <input id="emailReplyTo" type="email" placeholder="Reply-to email" />
-              <button id="gmailDefaultsBtn" class="btn btn-ghost" type="button">Use Gmail Defaults</button>
-              <button id="saveEmailConfigBtn" class="btn btn-primary" type="button">Save Email Setup</button>
-            </div>
-            <div class="inline-col">
-              <input id="emailTestRecipient" type="email" placeholder="Test recipient email" />
-              <input id="emailTestSubject" type="text" placeholder="Test subject" value="COM-SERVE email test" />
-              <textarea id="emailTestMessage" rows="5" placeholder="Test message">This is a test message from COM-SERVE.</textarea>
-              <button id="sendTestEmailBtn" class="btn btn-primary" type="button">Send Test Email</button>
-              <p id="emailConfigMessage" class="message"></p>
-            </div>
-          </div>
         </section>
 
         <section class="card">

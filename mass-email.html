@@ -23,16 +23,15 @@
       <p class="muted">Admin Control Center</p>
       <nav class="nav nav-stack" id="adminNav">
         <a href="admin.html">Admin Dashboard</a>
-        <a href="email-inbox.html">Email Inbox</a>
-        <a href="mass-email.html">Mass Email</a>
+        <a href="email-inbox.html">Email Services</a>
       </nav>
     </aside>
 
     <div class="app-main">
       <header class="site-header">
         <div>
-          <h1 class="page-title">Mass Email</h1>
-          <p class="muted">Send personalized emails to everyone or only households with outstanding balances.</p>
+          <h1 class="page-title">Mass Email Moved</h1>
+          <p class="muted">All email services now live on the Email Services page.</p>
         </div>
         <div class="top-actions">
           <button id="themeToggle" class="btn btn-ghost" type="button">Theme</button>
@@ -43,28 +42,8 @@
       <main class="page-wrap">
         <section class="card">
           <h2><span class="material-symbols-rounded icon">campaign</span>Mass Email System</h2>
-          <p class="muted">Each email starts with the recipient's email address. Outstanding-payment emails automatically include that person's outstanding amount.</p>
-          <div class="grid grid-2">
-            <div class="inline-col">
-              <label for="massEmailGroup">Target Group</label>
-              <select id="massEmailGroup">
-                <option value="all">Everyone with an email</option>
-                <option value="outstanding">Households with outstanding payments</option>
-              </select>
-              <input id="massEmailSubject" type="text" placeholder="Subject" />
-              <textarea id="massEmailMessage" rows="8" placeholder="Message"></textarea>
-              <button id="sendMassEmailBtn" class="btn btn-primary" type="button">Send Mass Email</button>
-            </div>
-
-            <div class="inline-col">
-              <div class="list">
-                <div class="list-item">Targets only households with a saved email address.</div>
-                <div class="list-item">Uses the household's chosen display name for personalization.</div>
-                <div class="list-item">Includes current outstanding totals for the outstanding group.</div>
-              </div>
-              <p id="massEmailStatus" class="message"></p>
-            </div>
-          </div>
+          <p class="muted">Mass email tools are now centralized with EmailJS setup and inbox management.</p>
+          <a class="btn btn-primary" href="email-inbox.html">Open Email Services</a>
         </section>
       </main>
 
