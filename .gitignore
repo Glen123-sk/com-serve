@@ -1,0 +1,6 @@
+target/
+.idea/
+.vscode/
+*.iml
+server/node_modules/
+server/.env

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auth App | Verify OTP</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body data-page="otp">
+  <main class="container">
+    <section class="card">
+      <h1>Verify OTP</h1>
+      <p>Enter the 6-digit code sent to <strong id="otp-email"></strong>.</p>
+
+      <form id="otp-form">
+        <div>
+          <label for="otp">One-time code</label>
+          <input id="otp" name="otp" class="otp-input" maxlength="6" required />
+        </div>
+        <button class="btn-primary" type="submit">Verify</button>
+      </form>
+
+      <div id="otp-message" class="message"></div>
+      <div class="link-row">
+        <button id="resend-btn" type="button" class="btn-outline">Resend OTP</button>
+        <a href="/index.html">Home</a>
+      </div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

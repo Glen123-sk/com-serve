@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auth App | Login</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body data-page="login">
+  <main class="container">
+    <section class="card">
+      <h1>Welcome back</h1>
+      <p>Log in using your registered email and password.</p>
+
+      <form id="login-form">
+        <div>
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required />
+        </div>
+        <div>
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required />
+        </div>
+        <button class="btn-primary" type="submit">Login</button>
+      </form>
+
+      <div id="login-message" class="message"></div>
+      <div class="link-row">
+        <a href="/forgot-password.html">Forgot password?</a>
+        <a href="/signup.html">Sign up</a>
+      </div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

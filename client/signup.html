@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auth App | Sign Up</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body data-page="signup">
+  <main class="container">
+    <section class="card">
+      <h1>Create your account</h1>
+      <p>Sign up to receive a one-time verification code by email.</p>
+
+      <form id="signup-form">
+        <div>
+          <label for="username">Username</label>
+          <input id="username" name="username" required minlength="3" />
+        </div>
+        <div>
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required />
+        </div>
+        <div>
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required />
+          <div class="small">At least 8 chars with uppercase, lowercase, number, and symbol.</div>
+        </div>
+        <div>
+          <label for="confirmPassword">Confirm Password</label>
+          <input id="confirmPassword" name="confirmPassword" type="password" required />
+        </div>
+        <button class="btn-primary" type="submit">Submit</button>
+      </form>
+
+      <div id="signup-message" class="message"></div>
+      <div class="link-row">
+        <a href="/login.html">Already have an account? Login</a>
+        <a href="/index.html">Back to home</a>
+      </div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
